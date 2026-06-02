@@ -54,7 +54,6 @@ h1 {
   background: #fff8b3;
   padding: 12px;
   border-radius: 8px;
-  position: relative;
   word-wrap: break-word;
   box-shadow: 0 1px 4px rgba(0,0,0,0.1);
 }
@@ -62,7 +61,6 @@ h1 {
 .vote-section {
   margin-top: 10px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
 }
 
@@ -105,25 +103,22 @@ textarea {
 .add-btn:hover {
   background: #15803d;
 }
-
-@media (max-width: 1000px) {
-  .board {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 600px) {
-  .board {
-    grid-template-columns: 1fr;
-  }
-}
 </style>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- ✅ Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
-  <script>
+</head>
+
+<body>
+
+<h1>Sprint Retrospective</h1>
+<div class="board" id="board"></div>
+
+<!-- ✅ MAIN SCRIPT -->
+<script>
+// ✅ Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyDBA-w2PwOEyXBhbhbaJC2VXzB9cMylNio",
   authDomain: "retro-board-d3ebd.firebaseapp.com",
@@ -134,20 +129,11 @@ const firebaseConfig = {
   measurementId: "G-F0T6FTM4HX"
 };
 
+// ✅ Init Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-</script>
 
-  
-</head>
-
-<body>
-
-<h1>Sprint Retrospective</h1>
-
-<div class="board" id="board"></div>
-
-<script>
+// ✅ Columns
 const columns = [
   "What Went Well?",
   "What didn't go so well?",
@@ -157,62 +143,77 @@ const columns = [
 
 const board = document.getElementById("board");
 
+// ✅ Create UI
 columns.forEach((title, index) => {
   const column = document.createElement("div");
   column.className = "column";
 
   column.innerHTML = `
     <div class="column-header">${title}</div>
-
     <div class="cards" id="cards-${index}"></div>
-
     <div class="add-card">
-      <textarea id="input-${index}" rows="3"
-        placeholder="Add your point..."></textarea>
-      <button class="add-btn" onclick="addCard(${index})">
-        Add Point
-      </button>
+      <textarea id="input-${index}" rows="3" placeholder="Add your point..."></textarea>
+      <button class="add-btn" onclick="addCard(${index})">Add Point</button>
     </div>
   `;
 
   board.appendChild(column);
 });
 
+// ✅ ADD CARD (now saves to Firebase)
 function addCard(columnId) {
   const input = document.getElementById(`input-${columnId}`);
   const text = input.value.trim();
-
   if (!text) return;
 
-  const card = document.createElement("div");
-  card.className = "card";
-
-  card.innerHTML = `
-    <div>${text}</div>
-    <div class="vote-section">
-      <span class="vote-count">0 votes</span>
-      <button class="vote-btn">👍 Vote</button>
-    </div>
-  `;
-
-  const voteBtn = card.querySelector(".vote-btn");
-  const voteCount = card.querySelector(".vote-count");
-
-  let votes = 0;
-
-  voteBtn.addEventListener("click", () => {
-    votes++;
-    voteCount.textContent =
-      votes === 1 ? "1 vote" : `${votes} votes`;
+  db.collection("cards").add({
+    text: text,
+    columnId: columnId,
+    votes: 0,
+    createdAt: new Date()
   });
 
-  document
-    .getElementById(`cards-${columnId}`)
-    .appendChild(card);
-
   input.value = "";
+}
+
+// ✅ REAL-TIME LISTENER (THIS FIXES YOUR MAIN ISSUE)
+db.collection("cards")
+  .orderBy("createdAt")
+  .onSnapshot(snapshot => {
+
+    // Clear existing UI
+    document.querySelectorAll(".cards").forEach(el => el.innerHTML = "");
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+
+      const card = document.createElement("div");
+      card.className = "card";
+
+      card.innerHTML = `
+        <div>${data.text}</div>
+        <div class="vote-section">
+          <span>${data.votes} votes</span>
+          <button class="vote-btn" onclick="vote('${doc.id}', ${data.votes})">
+            👍 Vote
+          </button>
+        </div>
+      `;
+
+      document
+        .getElementById(`cards-${data.columnId}`)
+        .appendChild(card);
+    });
+});
+
+// ✅ VOTE FUNCTION (shared across users)
+function vote(id, currentVotes) {
+  db.collection("cards").doc(id).update({
+    votes: currentVotes + 1
+  });
 }
 </script>
 
 </body>
 </html>
+``
